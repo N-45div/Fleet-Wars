@@ -1,0 +1,703 @@
+{
+  "address": "DiXQ85BSfM9qgPaTv6PAb2GhxRgGhfoarNGyAYJAqdJn",
+  "metadata": {
+    "name": "fleet_wars",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "create_game",
+      "docs": [
+        "Phase 1 — L1: Player1 creates a game, commits their board hash, deposits wager."
+      ],
+      "discriminator": [
+        124,
+        69,
+        75,
+        66,
+        184,
+        220,
+        72,
+        206
+      ],
+      "accounts": [
+        {
+          "name": "game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player1"
+              },
+              {
+                "kind": "arg",
+                "path": "game_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "player1",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "game_id",
+          "type": "u64"
+        },
+        {
+          "name": "board_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "wager",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "delegate_game",
+      "docs": [
+        "Phase 1 — L1: Player1 delegates the game account to MagicBlock Ephemeral Rollup."
+      ],
+      "discriminator": [
+        116,
+        183,
+        70,
+        107,
+        112,
+        223,
+        122,
+        210
+      ],
+      "accounts": [
+        {
+          "name": "player1",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "validator",
+          "optional": true
+        },
+        {
+          "name": "buffer_pda",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pda"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                188,
+                239,
+                109,
+                155,
+                161,
+                35,
+                107,
+                125,
+                162,
+                216,
+                132,
+                38,
+                196,
+                170,
+                53,
+                71,
+                199,
+                79,
+                25,
+                229,
+                184,
+                67,
+                244,
+                225,
+                187,
+                234,
+                236,
+                194,
+                169,
+                37,
+                212,
+                7
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegation_record_pda",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pda"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "delegation_metadata_pda",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pda"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "pda",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player1"
+              },
+              {
+                "kind": "arg",
+                "path": "game_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "owner_program",
+          "address": "DiXQ85BSfM9qgPaTv6PAb2GhxRgGhfoarNGyAYJAqdJn"
+        },
+        {
+          "name": "delegation_program",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        }
+      ],
+      "args": [
+        {
+          "name": "game_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "end_session",
+      "docs": [
+        "Phase 2 — ER: Manually end the ER session (e.g. opponent abandoned)."
+      ],
+      "discriminator": [
+        11,
+        244,
+        61,
+        154,
+        212,
+        249,
+        15,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "game",
+          "writable": true
+        },
+        {
+          "name": "player",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "magic_context",
+          "writable": true,
+          "address": "MagicContext1111111111111111111111111111111"
+        },
+        {
+          "name": "magic_program",
+          "address": "Magic11111111111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "finalize",
+      "docs": [
+        "Phase 3 — L1: Verifies both reveals, detects cheaters, pays winner."
+      ],
+      "discriminator": [
+        171,
+        61,
+        218,
+        56,
+        127,
+        115,
+        12,
+        217
+      ],
+      "accounts": [
+        {
+          "name": "game",
+          "writable": true
+        },
+        {
+          "name": "winner",
+          "writable": true
+        },
+        {
+          "name": "caller",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "fire_shot",
+      "docs": [
+        "Phase 2 — ER: Active player fires a shot at a cell (0–63)."
+      ],
+      "discriminator": [
+        66,
+        150,
+        104,
+        42,
+        242,
+        254,
+        17,
+        199
+      ],
+      "accounts": [
+        {
+          "name": "game",
+          "writable": true
+        },
+        {
+          "name": "player",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "cell",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "join_game",
+      "docs": [
+        "Phase 1 — L1: Player2 joins, commits their board hash, deposits wager."
+      ],
+      "discriminator": [
+        107,
+        112,
+        18,
+        38,
+        56,
+        173,
+        60,
+        128
+      ],
+      "accounts": [
+        {
+          "name": "game",
+          "writable": true
+        },
+        {
+          "name": "player2",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "board_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "process_undelegation",
+      "discriminator": [
+        196,
+        28,
+        41,
+        206,
+        48,
+        37,
+        51,
+        167
+      ],
+      "accounts": [
+        {
+          "name": "base_account",
+          "writable": true
+        },
+        {
+          "name": "buffer"
+        },
+        {
+          "name": "payer",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "account_seeds",
+          "type": {
+            "vec": "bytes"
+          }
+        }
+      ]
+    },
+    {
+      "name": "respond_shot",
+      "docs": [
+        "Phase 2 — ER: Opponent declares hit or miss for the last shot.",
+        "Auto-undelegates back to L1 when all ships are sunk."
+      ],
+      "discriminator": [
+        59,
+        59,
+        219,
+        146,
+        86,
+        104,
+        104,
+        45
+      ],
+      "accounts": [
+        {
+          "name": "game",
+          "writable": true
+        },
+        {
+          "name": "player",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "hit",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "reveal_board",
+      "docs": [
+        "Phase 3 — L1: Each player reveals their actual board + salt to prove honesty."
+      ],
+      "discriminator": [
+        24,
+        194,
+        178,
+        9,
+        120,
+        113,
+        199,
+        252
+      ],
+      "accounts": [
+        {
+          "name": "game",
+          "writable": true
+        },
+        {
+          "name": "player",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "board",
+          "type": "u64"
+        },
+        {
+          "name": "salt",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Game",
+      "discriminator": [
+        27,
+        90,
+        166,
+        125,
+        74,
+        100,
+        121,
+        18
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidGameState",
+      "msg": "Game is not in the expected state"
+    },
+    {
+      "code": 6001,
+      "name": "NotYourTurn",
+      "msg": "Not your turn"
+    },
+    {
+      "code": 6002,
+      "name": "CellAlreadyShot",
+      "msg": "Cell already shot"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidCell",
+      "msg": "Invalid cell — out of bounds (0–63)"
+    },
+    {
+      "code": 6004,
+      "name": "GameNotActive",
+      "msg": "Game is not active"
+    },
+    {
+      "code": 6005,
+      "name": "BoardHashMismatch",
+      "msg": "Board hash mismatch — cheater detected"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidBoard",
+      "msg": "Invalid board: must have exactly 9 ship cells"
+    },
+    {
+      "code": 6007,
+      "name": "GameNotReady",
+      "msg": "Both players must reveal before finalize"
+    },
+    {
+      "code": 6008,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
+    }
+  ],
+  "types": [
+    {
+      "name": "Game",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "player1",
+            "type": "pubkey"
+          },
+          {
+            "name": "player2",
+            "type": "pubkey"
+          },
+          {
+            "name": "p1_board_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "p2_board_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "p1_shots",
+            "type": "u64"
+          },
+          {
+            "name": "p2_shots",
+            "type": "u64"
+          },
+          {
+            "name": "p1_declared_hits",
+            "type": "u64"
+          },
+          {
+            "name": "p2_declared_hits",
+            "type": "u64"
+          },
+          {
+            "name": "p1_board",
+            "type": "u64"
+          },
+          {
+            "name": "p2_board",
+            "type": "u64"
+          },
+          {
+            "name": "wager",
+            "type": "u64"
+          },
+          {
+            "name": "game_id",
+            "type": "u64"
+          },
+          {
+            "name": "p1_hits_on_p2",
+            "type": "u8"
+          },
+          {
+            "name": "p2_hits_on_p1",
+            "type": "u8"
+          },
+          {
+            "name": "last_shot_cell",
+            "type": "u8"
+          },
+          {
+            "name": "turn_state",
+            "type": "u8"
+          },
+          {
+            "name": "game_state",
+            "type": "u8"
+          },
+          {
+            "name": "p1_revealed",
+            "type": "bool"
+          },
+          {
+            "name": "p2_revealed",
+            "type": "bool"
+          },
+          {
+            "name": "winner",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}
