@@ -1,0 +1,199 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0a0a0f;
+  --foreground: #e0e0e0;
+  --neon-cyan: #00f5ff;
+  --neon-pink: #ff00ff;
+  --neon-green: #00ff88;
+  --neon-orange: #ff6b00;
+  --neon-red: #ff3366;
+  --grid-color: rgba(0, 245, 255, 0.1);
+  --card-bg: rgba(15, 15, 25, 0.9);
+  --card-border: rgba(0, 245, 255, 0.3);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-neon-cyan: var(--neon-cyan);
+  --color-neon-pink: var(--neon-pink);
+  --color-neon-green: var(--neon-green);
+  --color-neon-orange: var(--neon-orange);
+  --color-neon-red: var(--neon-red);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Orbitron', 'Courier New', monospace;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Cyberpunk grid background */
+.cyber-grid {
+  background-image: 
+    linear-gradient(var(--grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+  background-size: 50px 50px;
+  background-position: -1px -1px;
+}
+
+/* Neon glow effects */
+.neon-text {
+  text-shadow: 
+    0 0 5px var(--neon-cyan),
+    0 0 10px var(--neon-cyan),
+    0 0 20px var(--neon-cyan),
+    0 0 40px var(--neon-cyan);
+}
+
+.neon-text-pink {
+  text-shadow: 
+    0 0 5px var(--neon-pink),
+    0 0 10px var(--neon-pink),
+    0 0 20px var(--neon-pink);
+}
+
+.neon-box {
+  box-shadow: 
+    0 0 5px var(--neon-cyan),
+    0 0 10px var(--neon-cyan),
+    inset 0 0 5px rgba(0, 245, 255, 0.1);
+}
+
+.neon-box-pink {
+  box-shadow: 
+    0 0 5px var(--neon-pink),
+    0 0 10px var(--neon-pink),
+    inset 0 0 5px rgba(255, 0, 255, 0.1);
+}
+
+/* Scanline effect */
+.scanlines::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.1) 2px,
+    rgba(0, 0, 0, 0.1) 4px
+  );
+  pointer-events: none;
+}
+
+/* Game board cell styles */
+.cell {
+  transition: all 0.2s ease;
+  border: 1px solid rgba(0, 245, 255, 0.2);
+  background: rgba(0, 20, 40, 0.6);
+}
+
+.cell:hover {
+  background: rgba(0, 245, 255, 0.2);
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 10px var(--neon-cyan);
+}
+
+.cell.ship {
+  background: linear-gradient(135deg, rgba(0, 245, 255, 0.4), rgba(0, 100, 150, 0.6));
+  border-color: var(--neon-cyan);
+}
+
+.cell.hit {
+  background: linear-gradient(135deg, rgba(255, 51, 102, 0.6), rgba(200, 0, 50, 0.8));
+  border-color: var(--neon-red);
+  animation: pulse-red 1s infinite;
+}
+
+.cell.miss {
+  background: rgba(100, 100, 100, 0.3);
+  border-color: rgba(150, 150, 150, 0.5);
+}
+
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 5px var(--neon-red); }
+  50% { box-shadow: 0 0 15px var(--neon-red), 0 0 25px var(--neon-red); }
+}
+
+@keyframes pulse-cyan {
+  0%, 100% { box-shadow: 0 0 5px var(--neon-cyan); }
+  50% { box-shadow: 0 0 15px var(--neon-cyan), 0 0 25px var(--neon-cyan); }
+}
+
+/* Button styles */
+.btn-cyber {
+  position: relative;
+  padding: 12px 32px;
+  background: transparent;
+  border: 2px solid var(--neon-cyan);
+  color: var(--neon-cyan);
+  font-family: 'Orbitron', monospace;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.btn-cyber::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
+  transition: left 0.5s ease;
+}
+
+.btn-cyber:hover {
+  background: rgba(0, 245, 255, 0.1);
+  box-shadow: 0 0 20px var(--neon-cyan);
+}
+
+.btn-cyber:hover::before {
+  left: 100%;
+}
+
+.btn-cyber-pink {
+  border-color: var(--neon-pink);
+  color: var(--neon-pink);
+}
+
+.btn-cyber-pink:hover {
+  background: rgba(255, 0, 255, 0.1);
+  box-shadow: 0 0 20px var(--neon-pink);
+}
+
+/* Card styles */
+.card-cyber {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  backdrop-filter: blur(10px);
+}
+
+/* Wallet button override */
+.wallet-adapter-button {
+  background: transparent !important;
+  border: 2px solid var(--neon-cyan) !important;
+  color: var(--neon-cyan) !important;
+  font-family: 'Orbitron', monospace !important;
+  transition: all 0.3s ease !important;
+}
+
+.wallet-adapter-button:hover {
+  background: rgba(0, 245, 255, 0.1) !important;
+  box-shadow: 0 0 20px var(--neon-cyan) !important;
+}
