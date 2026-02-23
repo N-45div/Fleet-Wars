@@ -11,6 +11,11 @@ export const DELEGATION_PROGRAM_ID = new PublicKey(
   "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
 );
 
+// Buffer program ID (different from delegation program)
+export const BUFFER_PROGRAM_ID = new PublicKey(
+  "BUFFERariAuK3P8DKvprxRt8dkLSmVxPCN3Ck4BVKQ9q"
+);
+
 export const MAGIC_CONTEXT = new PublicKey(
   "MagicContext1111111111111111111111111111111"
 );
@@ -30,11 +35,13 @@ export const MAGIC_ROUTER_WS = "wss://devnet-router.magicblock.app";
 export const GAME_SEED = "game";
 export const BUFFER_SEED = "buffer";
 
-// Game state enum values
+// Game state enum values - MUST match on-chain state.rs
 export enum GameState {
   WaitingForPlayer = 0,
-  Active = 1,
-  Finished = 2,
+  Ready = 1,
+  Active = 2,
+  WaitingReveal = 3,
+  Finished = 4,
 }
 
 // Turn state enum values
@@ -81,9 +88,11 @@ export function getGamePda(player1: PublicKey, gameId: BN): [PublicKey, number] 
 }
 
 export function getBufferPda(gamePda: PublicKey): [PublicKey, number] {
+  // Buffer PDA is derived with: ["buffer", delegated_account]
+  // Program ID from IDL is the owner program (Fleet Wars)
   return PublicKey.findProgramAddressSync(
     [Buffer.from(BUFFER_SEED), gamePda.toBuffer()],
-    DELEGATION_PROGRAM_ID
+    FLEET_WARS_PROGRAM_ID
   );
 }
 
