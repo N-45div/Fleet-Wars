@@ -3,15 +3,15 @@
 import { useState, useCallback, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { GameLobby } from "@/components/GameLobby";
 import { ShipPlacement } from "@/components/ShipPlacement";
 import { GamePlay } from "@/components/GamePlay";
-import { Anchor, Zap, Shield, Target, Coins } from "lucide-react";
+import { Anchor, Zap, Shield, Target, Coins, Loader2, Copy, Check, X, AlertCircle } from "lucide-react";
 import { useFleetWars, GameState as OnChainGameState, TurnState } from "@/hooks/useFleetWars";
-import { BN, bitmaskToShips } from "@/lib/program";
+import { BN, bitmaskToShips, GameState } from "@/lib/program";
 
-type ViewState = "landing" | "lobby" | "placement" | "playing";
+type ViewState = "landing" | "lobby" | "placement" | "waiting" | "playing" | "reveal" | "finished";
 type GameMode = "create" | "join" | null;
 
 interface ActiveGame {
@@ -44,6 +44,26 @@ export default function Home() {
   const [canRespond, setCanRespond] = useState(false);
   const [lastShotCell, setLastShotCell] = useState<number | null>(null);
   const [gamePhase, setGamePhase] = useState<"firing" | "responding">("firing");
+  const [copied, setCopied] = useState(false);
+  const [winner, setWinner] = useState<"me" | "opponent" | null>(null);
+  const [onChainGameState, setOnChainGameState] = useState<number>(0);
+  
+  // Toast notifications
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+  
+  const showToast = useCallback((message: string, type: "success" | "error" | "info" = "info") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  }, []);
+  
+  const copyGamePda = useCallback(() => {
+    if (activeGame?.pda) {
+      navigator.clipboard.writeText(activeGame.pda.toBase58());
+      setCopied(true);
+      showToast("Game PDA copied! Share with opponent.", "success");
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [activeGame, showToast]);
 
   // Handle creating a new game
   const handleCreateGame = useCallback((wager: number) => {
@@ -70,7 +90,7 @@ export default function Home() {
     setMyBoard(boardBitmask);
 
     if (gameMode === "create") {
-      // Create game on L1
+      showToast("Creating game on Solana...", "info");
       const result = await fleetWars.createGame(ships, pendingWager * 1e9);
       if (result) {
         setActiveGame({
@@ -81,16 +101,15 @@ export default function Home() {
           isPlayer1: true,
           wager: pendingWager,
         });
-        
-        // Delegate to ER
-        await fleetWars.delegateGame(result.gamePda, result.gameId);
-        setViewState("playing");
+        showToast("Game created! Waiting for opponent to join.", "success");
+        setViewState("waiting");
+      } else {
+        showToast(fleetWars.error || "Failed to create game", "error");
       }
     } else if (gameMode === "join" && pendingGamePda) {
-      // Join game on L1
+      showToast("Joining game...", "info");
       const result = await fleetWars.joinGame(pendingGamePda, ships);
       if (result) {
-        // Get game info to find gameId
         const gameAccount = await fleetWars.fetchGame(pendingGamePda);
         setActiveGame({
           pda: pendingGamePda,
@@ -100,14 +119,17 @@ export default function Home() {
           isPlayer1: false,
           wager: 0,
         });
+        showToast("Joined! Battle starting...", "success");
         setViewState("playing");
+      } else {
+        showToast(fleetWars.error || "Failed to join game", "error");
       }
     }
-  }, [gameMode, pendingWager, pendingGamePda, fleetWars]);
+  }, [gameMode, pendingWager, pendingGamePda, fleetWars, showToast]);
 
-  // Poll game state during gameplay
+  // Poll game state during waiting and playing
   useEffect(() => {
-    if (viewState !== "playing" || !activeGame) return;
+    if ((viewState !== "playing" && viewState !== "waiting") || !activeGame) return;
 
     const pollInterval = setInterval(async () => {
       // Try ER first, fallback to L1
@@ -118,6 +140,32 @@ export default function Home() {
       
       if (gameInfo) {
         const { account, isPlayer1 } = gameInfo;
+        setOnChainGameState(account.gameState);
+        
+        // If waiting and game is now active, delegate to ER and transition to playing
+        if (viewState === "waiting" && account.gameState === GameState.Active) {
+          showToast("Opponent joined! Delegating to Ephemeral Rollup...", "info");
+          
+          // Player 1 delegates the game to ER now that both players have joined
+          if (isPlayer1 && activeGame.gameId) {
+            const delegated = await fleetWars.delegateGame(activeGame.pda, activeGame.gameId);
+            if (delegated) {
+              showToast("Game delegated! Battle starting!", "success");
+            } else {
+              showToast("Delegation failed, playing on L1.", "error");
+            }
+          }
+          
+          setViewState("playing");
+        }
+        
+        // Check for game end - WaitingReveal means winner decided, needs reveal
+        if (account.gameState === GameState.WaitingReveal || account.gameState === GameState.Finished) {
+          const iWon = (isPlayer1 && account.winner === 1) || (!isPlayer1 && account.winner === 2);
+          setWinner(iWon ? "me" : "opponent");
+          setViewState("finished");
+          return;
+        }
         
         // Update shots and hits based on player perspective
         if (isPlayer1) {
@@ -141,7 +189,7 @@ export default function Home() {
     }, 2000);
 
     return () => clearInterval(pollInterval);
-  }, [viewState, activeGame, fleetWars]);
+  }, [viewState, activeGame, fleetWars, showToast]);
 
   // Fire shot handler
   const handleFireShot = useCallback(async (cell: number) => {
@@ -149,11 +197,13 @@ export default function Home() {
     
     const result = await fleetWars.fireShot(activeGame.pda, cell);
     if (result) {
-      // Optimistically update UI
       const bit = BigInt(1) << BigInt(cell);
       setMyShots((prev) => prev | bit);
+      showToast(`Shot fired at ${String.fromCharCode(65 + Math.floor(cell / 8))}${(cell % 8) + 1}!`, "success");
+    } else {
+      showToast(fleetWars.error || "Failed to fire shot", "error");
     }
-  }, [activeGame, canFire, fleetWars]);
+  }, [activeGame, canFire, fleetWars, showToast]);
 
   // Respond to shot handler
   const handleRespondHit = useCallback(async (hit: boolean) => {
@@ -161,9 +211,37 @@ export default function Home() {
     
     const result = await fleetWars.respondShot(activeGame.pda, hit);
     if (result) {
-      console.log("Responded with hit:", hit);
+      showToast(hit ? "Hit confirmed!" : "Miss confirmed!", "info");
+    } else {
+      showToast(fleetWars.error || "Failed to respond", "error");
     }
-  }, [activeGame, canRespond, fleetWars]);
+  }, [activeGame, canRespond, fleetWars, showToast]);
+  
+  // Handle reveal board
+  const handleRevealBoard = useCallback(async () => {
+    if (!activeGame) return;
+    
+    showToast("Revealing board...", "info");
+    const result = await fleetWars.revealBoard(activeGame.pda, activeGame.ships, activeGame.salt);
+    if (result) {
+      showToast("Board revealed!", "success");
+    } else {
+      showToast(fleetWars.error || "Failed to reveal", "error");
+    }
+  }, [activeGame, fleetWars, showToast]);
+  
+  // Handle return to lobby
+  const handleReturnToLobby = useCallback(() => {
+    setViewState("lobby");
+    setActiveGame(null);
+    setGameMode(null);
+    setWinner(null);
+    setMyBoard(BigInt(0));
+    setMyShots(BigInt(0));
+    setMyHits(BigInt(0));
+    setOpponentShots(BigInt(0));
+    setOpponentHits(BigInt(0));
+  }, []);
 
   if (viewState === "landing") {
     return (
@@ -286,28 +364,206 @@ export default function Home() {
 
   if (viewState === "placement") {
     return (
-      <div className="py-8 flex justify-center">
-        <ShipPlacement onBoardComplete={handleBoardComplete} />
+      <>
+        <div className="py-8 flex justify-center">
+          <ShipPlacement onBoardComplete={handleBoardComplete} />
+        </div>
+        {/* Loading overlay */}
+        {fleetWars.loading && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+            <div className="text-center">
+              <Loader2 className="w-12 h-12 text-cyan-400 animate-spin mx-auto mb-4" />
+              <p className="text-cyan-400">Processing transaction...</p>
+            </div>
+          </div>
+        )}
+        {/* Toast */}
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 50 }}
+              className={`fixed bottom-6 right-6 px-6 py-3 rounded-lg border z-50 ${
+                toast.type === "success" ? "bg-green-500/20 border-green-500 text-green-400" :
+                toast.type === "error" ? "bg-red-500/20 border-red-500 text-red-400" :
+                "bg-cyan-500/20 border-cyan-500 text-cyan-400"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                {toast.type === "success" && <Check className="w-4 h-4" />}
+                {toast.type === "error" && <X className="w-4 h-4" />}
+                {toast.type === "info" && <AlertCircle className="w-4 h-4" />}
+                {toast.message}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </>
+    );
+  }
+
+  if (viewState === "waiting") {
+    return (
+      <div className="py-8 flex flex-col items-center justify-center min-h-[60vh]">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="card-cyber rounded-lg p-8 text-center max-w-md"
+        >
+          <Loader2 className="w-16 h-16 text-cyan-400 animate-spin mx-auto mb-6" />
+          <h2 className="text-2xl font-bold neon-text mb-4">WAITING FOR OPPONENT</h2>
+          <p className="text-gray-400 mb-6">
+            Share the Game PDA below with your opponent so they can join.
+          </p>
+          
+          {/* Game PDA Copy */}
+          <div className="bg-black/50 rounded-lg p-4 mb-6">
+            <p className="text-xs text-gray-500 mb-2">GAME PDA</p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-cyan-400 font-mono text-sm break-all">
+                {activeGame?.pda.toBase58()}
+              </code>
+              <button
+                onClick={copyGamePda}
+                className="p-2 rounded bg-cyan-500/20 hover:bg-cyan-500/30 transition-colors"
+              >
+                {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-cyan-400" />}
+              </button>
+            </div>
+          </div>
+          
+          {activeGame && activeGame.wager > 0 && (
+            <div className="text-yellow-400 text-sm mb-4">
+              💰 Wager: {activeGame.wager} SOL
+            </div>
+          )}
+          
+          <button
+            onClick={handleReturnToLobby}
+            className="btn-cyber btn-cyber-pink text-sm"
+          >
+            Cancel & Return to Lobby
+          </button>
+        </motion.div>
+        
+        {/* Toast */}
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 50 }}
+              className={`fixed bottom-6 right-6 px-6 py-3 rounded-lg border z-50 ${
+                toast.type === "success" ? "bg-green-500/20 border-green-500 text-green-400" :
+                toast.type === "error" ? "bg-red-500/20 border-red-500 text-red-400" :
+                "bg-cyan-500/20 border-cyan-500 text-cyan-400"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                {toast.type === "success" && <Check className="w-4 h-4" />}
+                {toast.type === "error" && <X className="w-4 h-4" />}
+                {toast.type === "info" && <AlertCircle className="w-4 h-4" />}
+                {toast.message}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     );
   }
 
   if (viewState === "playing") {
     return (
-      <div className="py-8">
-        <GamePlay
-          gameId={activeGame?.pda.toBase58() || "waiting..."}
-          isMyTurn={isMyTurn}
-          myBoard={myBoard}
-          myShots={myShots}
-          myHits={myHits}
-          opponentShots={opponentShots}
-          opponentHits={opponentHits}
-          onFireShot={handleFireShot}
-          onRespondHit={handleRespondHit}
-          gamePhase={gamePhase}
-        />
-      </div>
+      <>
+        <div className="py-8">
+          <GamePlay
+            gameId={activeGame?.pda.toBase58() || "waiting..."}
+            isMyTurn={isMyTurn}
+            myBoard={myBoard}
+            myShots={myShots}
+            myHits={myHits}
+            opponentShots={opponentShots}
+            opponentHits={opponentHits}
+            onFireShot={handleFireShot}
+            onRespondHit={handleRespondHit}
+            pendingShot={lastShotCell ?? undefined}
+            gamePhase={gamePhase}
+          />
+        </div>
+        {/* Loading overlay */}
+        {fleetWars.loading && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+            <div className="text-center">
+              <Loader2 className="w-12 h-12 text-cyan-400 animate-spin mx-auto mb-4" />
+              <p className="text-cyan-400">Processing transaction...</p>
+            </div>
+          </div>
+        )}
+        {/* Toast */}
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 50 }}
+              className={`fixed bottom-6 right-6 px-6 py-3 rounded-lg border z-50 ${
+                toast.type === "success" ? "bg-green-500/20 border-green-500 text-green-400" :
+                toast.type === "error" ? "bg-red-500/20 border-red-500 text-red-400" :
+                "bg-cyan-500/20 border-cyan-500 text-cyan-400"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                {toast.type === "success" && <Check className="w-4 h-4" />}
+                {toast.type === "error" && <X className="w-4 h-4" />}
+                {toast.type === "info" && <AlertCircle className="w-4 h-4" />}
+                {toast.message}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </>
+    );
+  }
+
+  if (viewState === "finished") {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="py-8 flex flex-col items-center justify-center min-h-[60vh]"
+      >
+        <div className="card-cyber rounded-lg p-8 text-center max-w-md">
+          <motion.h2
+            initial={{ scale: 0.5 }}
+            animate={{ scale: 1 }}
+            className={`text-5xl font-bold mb-4 ${winner === "me" ? "neon-text" : "neon-text-pink"}`}
+          >
+            {winner === "me" ? "🏆 VICTORY!" : "💀 DEFEAT"}
+          </motion.h2>
+          
+          <p className="text-xl text-gray-400 mb-6">
+            {winner === "me" 
+              ? "You destroyed the enemy fleet!" 
+              : "Your fleet was destroyed..."}
+          </p>
+          
+          <div className="space-y-3">
+            <button
+              onClick={handleRevealBoard}
+              className="btn-cyber w-full"
+            >
+              Reveal Board & Claim Reward
+            </button>
+            <button
+              onClick={handleReturnToLobby}
+              className="w-full py-3 rounded border border-gray-600 text-gray-400 hover:bg-gray-800 transition-colors"
+            >
+              Return to Lobby
+            </button>
+          </div>
+        </div>
+      </motion.div>
     );
   }
 
