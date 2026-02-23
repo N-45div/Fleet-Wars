@@ -144,19 +144,14 @@ export function useFleetWars() {
 
       try {
         const program = getProgram(baseProvider);
-        
-        const [bufferPda] = getBufferPda(gamePda);
-        const [delegationRecordPda] = getDelegationRecordPda(gamePda);
-        const [delegationMetadataPda] = getDelegationMetadataPda(gamePda);
 
+        // Let Anchor auto-derive the delegation PDAs based on IDL constraints
+        // Only pass the accounts we control: player1, validator, and pda
         const signature = await program.methods
           .delegateGame(gameId)
           .accountsPartial({
             player1: publicKey,
             validator: ER_VALIDATOR,
-            bufferPda,
-            delegationRecordPda,
-            delegationMetadataPda,
             pda: gamePda,
           })
           .rpc();
@@ -204,6 +199,7 @@ export function useFleetWars() {
           .accountsPartial({
             game: gamePda,
             player2: publicKey,
+            systemProgram: SystemProgram.programId,
           })
           .rpc();
 
