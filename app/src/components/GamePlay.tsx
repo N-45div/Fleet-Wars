@@ -171,6 +171,16 @@ export const GamePlay: FC<GamePlayProps> = ({
         </motion.div>
       </div>
 
+      <div className="mt-8 card-cyber rounded-lg p-4 text-sm text-gray-400">
+        <p className="text-gray-200 font-semibold mb-2">How battle works</p>
+        <ul className="list-disc list-inside space-y-1">
+          <li>When it says <span className="text-green-400">YOUR TURN</span>, click a cell on the enemy board and press Fire.</li>
+          <li>When you see <span className="text-pink-400">Enemy fired at ...</span>, choose Hit or Miss to respond.</li>
+          <li>First player to reach <span className="text-cyan-400">9 hits</span> wins. The game then enters reveal phase.</li>
+          <li>Click <span className="text-green-400">Reveal Board</span> at the end to prove your hits and claim rewards.</li>
+        </ul>
+      </div>
+
       {/* Winner announcement */}
       {gamePhase === "finished" && winner && (
         <motion.div

@@ -3,10 +3,13 @@
 import { FC, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { RotateCw, Trash2 } from "lucide-react";
+import { RotateCw, Trash2, Sparkles } from "lucide-react";
+import { ShipSkin, SHIP_SKINS } from "@/hooks/useShipNFTs";
 
 interface ShipPlacementProps {
   onBoardComplete: (board: bigint) => void;
+  onSkinSelect?: (skin: ShipSkin) => void;
+  selectedSkin?: ShipSkin;
 }
 
 const SHIPS = [
@@ -24,7 +27,8 @@ const GAME_SHIPS = [
   { name: "Submarine", size: 3 },
 ];
 
-export const ShipPlacement: FC<ShipPlacementProps> = ({ onBoardComplete }) => {
+export const ShipPlacement: FC<ShipPlacementProps> = ({ onBoardComplete, onSkinSelect, selectedSkin }) => {
+  const currentSkin = selectedSkin || SHIP_SKINS.default;
   const [board, setBoard] = useState<bigint>(BigInt(0));
   const [currentShipIndex, setCurrentShipIndex] = useState(0);
   const [isHorizontal, setIsHorizontal] = useState(true);
@@ -109,6 +113,16 @@ export const ShipPlacement: FC<ShipPlacementProps> = ({ onBoardComplete }) => {
         ) : (
           <p className="text-green-400 font-bold">All ships deployed! Ready for battle.</p>
         )}
+      </div>
+
+      <div className="card-cyber rounded-lg p-4 max-w-xl text-sm text-gray-400">
+        <p className="text-gray-200 font-semibold mb-2">How to place ships</p>
+        <ul className="list-disc list-inside space-y-1">
+          <li>Click any grid cell to place the highlighted ship.</li>
+          <li>Use <span className="text-cyan-400">Rotate</span> to switch horizontal/vertical.</li>
+          <li>Place 3 ships of 3 cells each (total 9 ship cells).</li>
+          <li>Press <span className="text-green-400">Ready for Battle</span> once all ships are placed.</li>
+        </ul>
       </div>
 
       {/* Controls */}
@@ -196,6 +210,36 @@ export const ShipPlacement: FC<ShipPlacementProps> = ({ onBoardComplete }) => {
           </div>
         ))}
       </div>
+
+      {/* Skin selector */}
+      {onSkinSelect && (
+        <div className="mt-4 p-4 card-cyber rounded-lg">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="w-4 h-4 text-purple-400" />
+            <span className="text-sm font-bold text-purple-400">Ship Skin (NFT)</span>
+          </div>
+          <div className="flex gap-2">
+            {Object.values(SHIP_SKINS).map((skin) => (
+              <button
+                key={skin.id}
+                onClick={() => onSkinSelect(skin)}
+                className={cn(
+                  "px-3 py-2 rounded border text-xs transition-all",
+                  currentSkin.id === skin.id
+                    ? "border-purple-500 bg-purple-500/20 text-purple-400"
+                    : "border-gray-600 text-gray-400 hover:border-gray-500"
+                )}
+              >
+                {skin.rarity === "legendary" && "🚀"}
+                {skin.rarity === "epic" && "⚔️"}
+                {skin.rarity === "rare" && "🛡️"}
+                {skin.rarity === "common" && "⚓"}
+                {" "}{skin.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Confirm button */}
       {allShipsPlaced && (
