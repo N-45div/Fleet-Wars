@@ -6,7 +6,6 @@ import {
   WalletProvider as SolanaWalletProvider,
 } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
-import { PhantomWalletAdapter, SolflareWalletAdapter } from "@solana/wallet-adapter-wallets";
 import { clusterApiUrl } from "@solana/web3.js";
 
 import "@solana/wallet-adapter-react-ui/styles.css";
@@ -18,10 +17,9 @@ interface Props {
 export const WalletProvider: FC<Props> = ({ children }) => {
   const endpoint = useMemo(() => clusterApiUrl("devnet"), []);
 
-  const wallets = useMemo(
-    () => [new PhantomWalletAdapter(), new SolflareWalletAdapter()],
-    []
-  );
+  // Empty array - wallet-adapter auto-detects installed wallets (Phantom, Solflare, etc.)
+  // This avoids duplicate key errors from manually instantiating adapters
+  const wallets = useMemo(() => [], []);
 
   return (
     <ConnectionProvider endpoint={endpoint}>
