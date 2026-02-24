@@ -3,7 +3,7 @@
 import { useCallback, useState, useMemo } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram, Connection } from "@solana/web3.js";
-import { AnchorProvider } from "@coral-xyz/anchor";
+import { AnchorProvider, BN } from "@coral-xyz/anchor";
 import {
   getProgram,
   getGamePda,
@@ -13,10 +13,9 @@ import {
   computeBoardHash,
   shipsToBitmask,
   generateSalt,
+  GameAccount,
   GameState,
   TurnState,
-  GameAccount,
-  BN,
   FLEET_WARS_PROGRAM_ID,
   DELEGATION_PROGRAM_ID,
   MAGIC_CONTEXT,
@@ -145,14 +144,23 @@ export function useFleetWars() {
       try {
         const program = getProgram(baseProvider);
 
-        // Let Anchor auto-derive the delegation PDAs based on IDL constraints
-        // Only pass the accounts we control: player1, validator, and pda
+        // Derive all required PDAs for delegation
+        const [bufferPda] = getBufferPda(gamePda);
+        const [delegationRecordPda] = getDelegationRecordPda(gamePda);
+        const [delegationMetadataPda] = getDelegationMetadataPda(gamePda);
+
         const signature = await program.methods
           .delegateGame(gameId)
           .accountsPartial({
             player1: publicKey,
             validator: ER_VALIDATOR,
+            bufferPda: bufferPda,
+            delegationRecordPda: delegationRecordPda,
+            delegationMetadataPda: delegationMetadataPda,
             pda: gamePda,
+            systemProgram: SystemProgram.programId,
+            ownerProgram: FLEET_WARS_PROGRAM_ID,
+            delegationProgram: DELEGATION_PROGRAM_ID,
           })
           .rpc();
 
@@ -217,10 +225,10 @@ export function useFleetWars() {
     [baseProvider, publicKey]
   );
 
-  // Fire shot on ER
+  // Fire shot - try ER first, fallback to L1
   const fireShot = useCallback(
     async (gamePda: PublicKey, cell: number): Promise<string | null> => {
-      if (!erProvider || !publicKey) {
+      if (!publicKey) {
         setError("Wallet not connected");
         return null;
       }
@@ -233,35 +241,58 @@ export function useFleetWars() {
       setLoading(true);
       setError(null);
 
-      try {
-        const program = getProgram(erProvider);
+      // Try ER first
+      if (erProvider) {
+        try {
+          const program = getProgram(erProvider);
+          const signature = await program.methods
+            .fireShot(cell)
+            .accounts({
+              game: gamePda,
+              player: publicKey,
+            })
+            .rpc();
 
-        const signature = await program.methods
-          .fireShot(cell)
-          .accounts({
-            game: gamePda,
-            player: publicKey,
-          })
-          .rpc();
-
-        console.log("Shot fired at cell", cell, "tx:", signature);
-        return signature;
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : "Failed to fire shot";
-        console.error("Fire shot error:", err);
-        setError(message);
-        return null;
-      } finally {
-        setLoading(false);
+          console.log("Shot fired on ER at cell", cell, "tx:", signature);
+          return signature;
+        } catch (erErr: unknown) {
+          console.warn("ER fire shot failed, trying L1:", erErr);
+        }
       }
+
+      // Fallback to L1
+      if (baseProvider) {
+        try {
+          const program = getProgram(baseProvider);
+          const signature = await program.methods
+            .fireShot(cell)
+            .accounts({
+              game: gamePda,
+              player: publicKey,
+            })
+            .rpc();
+
+          console.log("Shot fired on L1 at cell", cell, "tx:", signature);
+          return signature;
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : "Failed to fire shot";
+          console.error("Fire shot error:", err);
+          setError(message);
+          return null;
+        }
+      }
+
+      setError("No provider available");
+      setLoading(false);
+      return null;
     },
-    [erProvider, publicKey]
+    [erProvider, baseProvider, publicKey]
   );
 
-  // Respond to shot on ER
+  // Respond to shot - try ER first, fallback to L1
   const respondShot = useCallback(
     async (gamePda: PublicKey, hit: boolean): Promise<string | null> => {
-      if (!erProvider || !publicKey) {
+      if (!publicKey) {
         setError("Wallet not connected");
         return null;
       }
@@ -269,29 +300,52 @@ export function useFleetWars() {
       setLoading(true);
       setError(null);
 
-      try {
-        const program = getProgram(erProvider);
+      // Try ER first
+      if (erProvider) {
+        try {
+          const program = getProgram(erProvider);
+          const signature = await program.methods
+            .respondShot(hit)
+            .accounts({
+              game: gamePda,
+              player: publicKey,
+            })
+            .rpc();
 
-        const signature = await program.methods
-          .respondShot(hit)
-          .accounts({
-            game: gamePda,
-            player: publicKey,
-          })
-          .rpc();
-
-        console.log("Responded to shot, hit:", hit, "tx:", signature);
-        return signature;
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : "Failed to respond to shot";
-        console.error("Respond shot error:", err);
-        setError(message);
-        return null;
-      } finally {
-        setLoading(false);
+          console.log("Responded on ER, hit:", hit, "tx:", signature);
+          return signature;
+        } catch (erErr: unknown) {
+          console.warn("ER respond shot failed, trying L1:", erErr);
+        }
       }
+
+      // Fallback to L1
+      if (baseProvider) {
+        try {
+          const program = getProgram(baseProvider);
+          const signature = await program.methods
+            .respondShot(hit)
+            .accounts({
+              game: gamePda,
+              player: publicKey,
+            })
+            .rpc();
+
+          console.log("Responded on L1, hit:", hit, "tx:", signature);
+          return signature;
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : "Failed to respond to shot";
+          console.error("Respond shot error:", err);
+          setError(message);
+          return null;
+        }
+      }
+
+      setError("No provider available");
+      setLoading(false);
+      return null;
     },
-    [erProvider, publicKey]
+    [erProvider, baseProvider, publicKey]
   );
 
   // End session (manual undelegate)

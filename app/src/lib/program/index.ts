@@ -89,10 +89,10 @@ export function getGamePda(player1: PublicKey, gameId: BN): [PublicKey, number] 
 
 export function getBufferPda(gamePda: PublicKey): [PublicKey, number] {
   // Buffer PDA is derived with: ["buffer", delegated_account]
-  // Program ID from IDL is the owner program (Fleet Wars)
+  // Uses the BUFFER_PROGRAM_ID (not Fleet Wars or Delegation program)
   return PublicKey.findProgramAddressSync(
     [Buffer.from(BUFFER_SEED), gamePda.toBuffer()],
-    FLEET_WARS_PROGRAM_ID
+    BUFFER_PROGRAM_ID
   );
 }
 
