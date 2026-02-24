@@ -306,7 +306,7 @@ graph TD
 | Animations | Framer Motion |
 | Icons | Lucide React |
 | Blockchain | Solana (Devnet) |
-| Smart Contracts | Anchor 0.30.1 |
+| Solana Programs | Anchor 0.30.1 |
 | Ephemeral Rollups | MagicBlock SDK |
 | Wallet Connection | Solana Wallet Adapter |
 | Type Safety | TypeScript 5 |
