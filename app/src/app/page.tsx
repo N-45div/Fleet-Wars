@@ -49,6 +49,7 @@ export default function Home() {
   const [onChainGameState, setOnChainGameState] = useState<number>(0);
   const [hasDelegated, setHasDelegated] = useState(false);
   const delegatingRef = useRef(false);
+  const finalizeRef = useRef(false);
   
   // Toast notifications
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
@@ -105,6 +106,7 @@ export default function Home() {
         });
         setHasDelegated(false);
         delegatingRef.current = false;
+        finalizeRef.current = false;
         showToast("Game created! Waiting for opponent to join.", "success");
         setViewState("waiting");
       } else {
@@ -125,6 +127,7 @@ export default function Home() {
         });
         setHasDelegated(false);
         delegatingRef.current = false;
+        finalizeRef.current = false;
         showToast("Joined! Battle starting...", "success");
         setViewState("playing");
       } else {
@@ -262,6 +265,41 @@ export default function Home() {
       showToast(fleetWars.error || "Failed to reveal", "error");
     }
   }, [activeGame, fleetWars, onChainGameState, showToast, publicKey]);
+
+  // Auto-finalize once both players reveal and winner is this wallet
+  useEffect(() => {
+    if (viewState !== "finished" || !activeGame || !publicKey) return;
+    if (onChainGameState !== GameState.WaitingReveal) return;
+
+    const interval = setInterval(async () => {
+      if (finalizeRef.current) return;
+
+      const gameAccount = await fleetWars.fetchGame(activeGame.pda);
+      if (!gameAccount) return;
+
+      if (gameAccount.gameState === GameState.Finished) {
+        finalizeRef.current = true;
+        return;
+      }
+
+      if (gameAccount.p1Revealed && gameAccount.p2Revealed) {
+        const winnerKey = gameAccount.winner === 1 ? gameAccount.player1 : gameAccount.player2;
+        if (winnerKey.equals(publicKey)) {
+          finalizeRef.current = true;
+          showToast("Finalizing game...", "info");
+          const finalizeResult = await fleetWars.finalize(activeGame.pda, winnerKey);
+          if (finalizeResult) {
+            showToast("Game finalized! Payout complete.", "success");
+          } else {
+            finalizeRef.current = false;
+            showToast(fleetWars.error || "Failed to finalize", "error");
+          }
+        }
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [viewState, activeGame, publicKey, onChainGameState, fleetWars, showToast]);
   
   // Handle return to lobby
   const handleReturnToLobby = useCallback(() => {
@@ -269,6 +307,7 @@ export default function Home() {
     setActiveGame(null);
     setGameMode(null);
     setWinner(null);
+    finalizeRef.current = false;
     setMyBoard(BigInt(0));
     setMyShots(BigInt(0));
     setMyHits(BigInt(0));
