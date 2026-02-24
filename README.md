@@ -15,18 +15,6 @@ Fleet Wars is a fully on-chain battleship-style game that leverages MagicBlock's
 
 ---
 
-## 🏆 Matrix Hackathon Submission
-
-**Tracks:**
-- ✅ **Solana On-Chain & Real-Time Gaming by MagicBlock** - Sub-second gameplay via Ephemeral Rollups
-- ✅ **On-chain Assets & Programmable Gaming Infra by Metaplex** - NFT ship skins via Metaplex Core
-
-**Category:** Strategy
-
-**Tech Stack:** Solana, Anchor, MagicBlock Ephemeral Rollups, Metaplex Core, React, Next.js, TypeScript, TailwindCSS
-
----
-
 ## 🎮 Game Description
 
 Fleet Wars brings the classic naval combat experience to the blockchain with a modern twist. Two players compete in strategic warfare, deploying their fleets on an 8x8 grid and taking turns to locate and destroy enemy ships.
@@ -257,11 +245,7 @@ The program uses the `#[ephemeral]` macro from MagicBlock SDK to enable:
 
 ## 📜 License
 
-MIT License - see [LICENSE](LICENSE) for details.
-
-## 🤝 Contributing
-
-Contributions welcome! Please read our contributing guidelines and submit PRs.
+Apache License - see [LICENSE](LICENSE) for details.
 
 ## 🔗 Links
 
