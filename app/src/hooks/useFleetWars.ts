@@ -144,6 +144,22 @@ export function useFleetWars() {
       try {
         const program = getProgram(baseProvider);
 
+        const accountInfo = await baseProvider.connection.getAccountInfo(gamePda);
+        if (!accountInfo) {
+          setError("Game account not found");
+          return null;
+        }
+
+        if (accountInfo.owner.equals(DELEGATION_PROGRAM_ID)) {
+          console.log("Game already delegated to ER");
+          return "already-delegated";
+        }
+
+        if (!accountInfo.owner.equals(FLEET_WARS_PROGRAM_ID)) {
+          setError("Game account is owned by an unexpected program");
+          return null;
+        }
+
         // Derive all required PDAs for delegation
         const [bufferPda] = getBufferPda(gamePda);
         const [delegationRecordPda] = getDelegationRecordPda(gamePda);
