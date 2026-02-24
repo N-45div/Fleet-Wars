@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { motion, AnimatePresence } from "framer-motion";
@@ -47,6 +47,8 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [winner, setWinner] = useState<"me" | "opponent" | null>(null);
   const [onChainGameState, setOnChainGameState] = useState<number>(0);
+  const [hasDelegated, setHasDelegated] = useState(false);
+  const delegatingRef = useRef(false);
   
   // Toast notifications
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
@@ -101,6 +103,8 @@ export default function Home() {
           isPlayer1: true,
           wager: pendingWager,
         });
+        setHasDelegated(false);
+        delegatingRef.current = false;
         showToast("Game created! Waiting for opponent to join.", "success");
         setViewState("waiting");
       } else {
@@ -119,6 +123,8 @@ export default function Home() {
           isPlayer1: false,
           wager: 0,
         });
+        setHasDelegated(false);
+        delegatingRef.current = false;
         showToast("Joined! Battle starting...", "success");
         setViewState("playing");
       } else {
@@ -147,11 +153,14 @@ export default function Home() {
           showToast("Opponent joined! Delegating to Ephemeral Rollup...", "info");
           
           // Player 1 delegates the game to ER now that both players have joined
-          if (isPlayer1 && activeGame.gameId) {
+          if (isPlayer1 && activeGame.gameId && !hasDelegated && !delegatingRef.current) {
+            delegatingRef.current = true;
             const delegated = await fleetWars.delegateGame(activeGame.pda, activeGame.gameId);
             if (delegated) {
+              setHasDelegated(true);
               showToast("Game delegated! Battle starting!", "success");
             } else {
+              delegatingRef.current = false;
               showToast("Delegation failed, playing on L1.", "error");
             }
           }
