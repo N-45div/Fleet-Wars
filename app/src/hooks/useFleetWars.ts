@@ -45,10 +45,19 @@ export interface GameInfo {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const isBlockhashNotFound = (err: unknown) => {
-  const message = err instanceof Error ? err.message : String(err);
-  return message.toLowerCase().includes("blockhash not found");
+const getErrorText = (err: unknown) => {
+  if (err && typeof err === "object") {
+    const anyErr = err as { message?: string; cause?: { message?: string }; logs?: string[] };
+    return [anyErr.message, anyErr.cause?.message, ...(anyErr.logs ?? [])]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  return String(err);
 };
+
+const isBlockhashNotFound = (err: unknown) =>
+  getErrorText(err).toLowerCase().includes("blockhash not found");
 
 export function useFleetWars() {
   const { connection } = useConnection();
