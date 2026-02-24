@@ -89,11 +89,13 @@ export function useFleetWars() {
           const latest = await erProvider.connection.getLatestBlockhashAndContext("processed");
           tx.feePayer = publicKey;
           tx.recentBlockhash = latest.value.blockhash;
+          tx.signatures = [];
 
           const signed = await erProvider.wallet.signTransaction(tx);
           const signature = await erProvider.connection.sendRawTransaction(signed.serialize(), {
             skipPreflight: true,
             minContextSlot: latest.context.slot,
+            maxRetries: 3,
           });
 
           await erProvider.connection.confirmTransaction(
