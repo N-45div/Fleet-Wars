@@ -11,9 +11,12 @@ export const DELEGATION_PROGRAM_ID = new PublicKey(
   "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
 );
 
-// Buffer program ID (different from delegation program)
+// Buffer program ID (from IDL bytes to avoid base58 mismatch)
 export const BUFFER_PROGRAM_ID = new PublicKey(
-  "BUFFERariAuK3P8DKvprxRt8dkLSmVxPCN3Ck4BVKQ9q"
+  Uint8Array.from([
+    188, 239, 109, 155, 161, 35, 107, 125, 162, 216, 132, 38, 196, 170, 53, 71,
+    199, 79, 25, 229, 184, 67, 244, 225, 187, 234, 236, 194, 169, 37, 212, 7,
+  ])
 );
 
 export const MAGIC_CONTEXT = new PublicKey(
