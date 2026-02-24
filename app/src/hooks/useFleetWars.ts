@@ -2,7 +2,7 @@
 
 import { useCallback, useState, useMemo } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, SystemProgram, Connection } from "@solana/web3.js";
+import { PublicKey, SystemProgram, Connection, Transaction } from "@solana/web3.js";
 import { AnchorProvider, BN } from "@coral-xyz/anchor";
 import {
   getProgram,
@@ -77,6 +77,47 @@ export function useFleetWars() {
       { commitment: "confirmed" }
     );
   }, [publicKey, signTransaction, signAllTransactions]);
+
+  const sendErTransaction = useCallback(
+    async (tx: Transaction): Promise<string> => {
+      if (!erProvider || !publicKey) {
+        throw new Error("ER provider not ready");
+      }
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          const latest = await erProvider.connection.getLatestBlockhashAndContext("processed");
+          tx.feePayer = publicKey;
+          tx.recentBlockhash = latest.value.blockhash;
+
+          const signed = await erProvider.wallet.signTransaction(tx);
+          const signature = await erProvider.connection.sendRawTransaction(signed.serialize(), {
+            skipPreflight: true,
+            minContextSlot: latest.context.slot,
+          });
+
+          await erProvider.connection.confirmTransaction(
+            {
+              signature,
+              blockhash: latest.value.blockhash,
+              lastValidBlockHeight: latest.value.lastValidBlockHeight,
+            },
+            "confirmed"
+          );
+
+          return signature;
+        } catch (err: unknown) {
+          if (!isBlockhashNotFound(err) || attempt === 2) {
+            throw err;
+          }
+          await sleep(300);
+        }
+      }
+
+      throw new Error("Failed to send ER transaction");
+    },
+    [erProvider, publicKey]
+  );
 
   // Create game on L1 (devnet)
   const createGame = useCallback(
@@ -278,22 +319,22 @@ export function useFleetWars() {
         if (erProvider) {
           try {
             const program = getProgram(erProvider);
-            const sendEr = async () =>
+            const buildTx = () =>
               program.methods
                 .fireShot(cell)
                 .accounts({
                   game: gamePda,
                   player: publicKey,
                 })
-                .rpc();
+                .transaction();
 
             let signature: string;
             try {
-              signature = await sendEr();
+              signature = await sendErTransaction(await buildTx());
             } catch (erErr: unknown) {
               if (isBlockhashNotFound(erErr)) {
                 await sleep(500);
-                signature = await sendEr();
+                signature = await sendErTransaction(await buildTx());
               } else {
                 throw erErr;
               }
@@ -343,7 +384,7 @@ export function useFleetWars() {
         setLoading(false);
       }
     },
-    [erProvider, baseProvider, publicKey, connection]
+    [erProvider, baseProvider, publicKey, connection, sendErTransaction]
   );
 
   // Respond to shot - try ER first, fallback to L1
@@ -371,22 +412,22 @@ export function useFleetWars() {
         if (erProvider) {
           try {
             const program = getProgram(erProvider);
-            const sendEr = async () =>
+            const buildTx = () =>
               program.methods
                 .respondShot(hit)
                 .accounts({
                   game: gamePda,
                   player: publicKey,
                 })
-                .rpc();
+                .transaction();
 
             let signature: string;
             try {
-              signature = await sendEr();
+              signature = await sendErTransaction(await buildTx());
             } catch (erErr: unknown) {
               if (isBlockhashNotFound(erErr)) {
                 await sleep(500);
-                signature = await sendEr();
+                signature = await sendErTransaction(await buildTx());
               } else {
                 throw erErr;
               }
