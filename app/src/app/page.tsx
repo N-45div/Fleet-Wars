@@ -229,15 +229,39 @@ export default function Home() {
   // Handle reveal board
   const handleRevealBoard = useCallback(async () => {
     if (!activeGame) return;
-    
+
+    if (onChainGameState !== GameState.WaitingReveal) {
+      showToast("Game is not ready to reveal yet.", "error");
+      return;
+    }
+
+    showToast("Ending ER session...", "info");
+    await fleetWars.endSession(activeGame.pda);
+
     showToast("Revealing board...", "info");
     const result = await fleetWars.revealBoard(activeGame.pda, activeGame.ships, activeGame.salt);
     if (result) {
       showToast("Board revealed!", "success");
+
+      const gameAccount = await fleetWars.fetchGame(activeGame.pda);
+      if (gameAccount?.p1Revealed && gameAccount?.p2Revealed) {
+        const winnerKey = gameAccount.winner === 1 ? gameAccount.player1 : gameAccount.player2;
+        if (winnerKey.equals(publicKey ?? PublicKey.default)) {
+          showToast("Finalizing game...", "info");
+          const finalizeResult = await fleetWars.finalize(activeGame.pda, winnerKey);
+          if (finalizeResult) {
+            showToast("Game finalized! Payout complete.", "success");
+          } else {
+            showToast(fleetWars.error || "Failed to finalize", "error");
+          }
+        } else {
+          showToast("Waiting for winner to finalize...", "info");
+        }
+      }
     } else {
       showToast(fleetWars.error || "Failed to reveal", "error");
     }
-  }, [activeGame, fleetWars, showToast]);
+  }, [activeGame, fleetWars, onChainGameState, showToast, publicKey]);
   
   // Handle return to lobby
   const handleReturnToLobby = useCallback(() => {

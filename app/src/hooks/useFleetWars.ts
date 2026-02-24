@@ -376,6 +376,14 @@ export function useFleetWars() {
       setError(null);
 
       try {
+        if (baseProvider) {
+          const accountInfo = await baseProvider.connection.getAccountInfo(gamePda);
+          if (accountInfo && accountInfo.owner.equals(FLEET_WARS_PROGRAM_ID)) {
+            console.log("Game already undelegated");
+            return "already-undelegated";
+          }
+        }
+
         const program = getProgram(erProvider);
 
         const signature = await program.methods
@@ -397,7 +405,7 @@ export function useFleetWars() {
         setLoading(false);
       }
     },
-    [erProvider, publicKey]
+    [erProvider, publicKey, baseProvider]
   );
 
   // Reveal board on L1 (after undelegation)

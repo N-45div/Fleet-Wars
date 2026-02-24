@@ -49,10 +49,10 @@ export enum GameState {
 
 // Turn state enum values
 export enum TurnState {
-  P1Fires = 0,
-  P1Responds = 1,
-  P2Fires = 2,
-  P2Responds = 3,
+  P1Fires = 1,
+  P2Responds = 2,
+  P2Fires = 3,
+  P1Responds = 4,
 }
 
 export interface GameAccount {
