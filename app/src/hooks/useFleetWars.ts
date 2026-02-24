@@ -43,6 +43,13 @@ export interface GameInfo {
   canRespond: boolean;
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isBlockhashNotFound = (err: unknown) => {
+  const message = err instanceof Error ? err.message : String(err);
+  return message.toLowerCase().includes("blockhash not found");
+};
+
 export function useFleetWars() {
   const { connection } = useConnection();
   const wallet = useWallet();
@@ -257,52 +264,86 @@ export function useFleetWars() {
       setLoading(true);
       setError(null);
 
-      // Try ER first
-      if (erProvider) {
-        try {
-          const program = getProgram(erProvider);
-          const signature = await program.methods
-            .fireShot(cell)
-            .accounts({
-              game: gamePda,
-              player: publicKey,
-            })
-            .rpc();
-
-          console.log("Shot fired on ER at cell", cell, "tx:", signature);
-          return signature;
-        } catch (erErr: unknown) {
-          console.warn("ER fire shot failed, trying L1:", erErr);
-        }
-      }
-
-      // Fallback to L1
-      if (baseProvider) {
-        try {
-          const program = getProgram(baseProvider);
-          const signature = await program.methods
-            .fireShot(cell)
-            .accounts({
-              game: gamePda,
-              player: publicKey,
-            })
-            .rpc();
-
-          console.log("Shot fired on L1 at cell", cell, "tx:", signature);
-          return signature;
-        } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : "Failed to fire shot";
-          console.error("Fire shot error:", err);
-          setError(message);
+      try {
+        const accountInfo = await connection.getAccountInfo(gamePda);
+        if (!accountInfo) {
+          setError("Game account not found");
           return null;
         }
-      }
 
-      setError("No provider available");
-      setLoading(false);
-      return null;
+        const isDelegated = accountInfo.owner.equals(DELEGATION_PROGRAM_ID);
+        const canUseL1 = accountInfo.owner.equals(FLEET_WARS_PROGRAM_ID);
+
+        // Try ER first
+        if (erProvider) {
+          try {
+            const program = getProgram(erProvider);
+            const sendEr = async () =>
+              program.methods
+                .fireShot(cell)
+                .accounts({
+                  game: gamePda,
+                  player: publicKey,
+                })
+                .rpc();
+
+            let signature: string;
+            try {
+              signature = await sendEr();
+            } catch (erErr: unknown) {
+              if (isBlockhashNotFound(erErr)) {
+                await sleep(500);
+                signature = await sendEr();
+              } else {
+                throw erErr;
+              }
+            }
+
+            console.log("Shot fired on ER at cell", cell, "tx:", signature);
+            return signature;
+          } catch (erErr: unknown) {
+            if (isDelegated) {
+              const message = erErr instanceof Error ? erErr.message : "Failed to fire shot on ER";
+              console.error("ER fire shot failed:", erErr);
+              setError(message);
+              return null;
+            }
+            console.warn("ER fire shot failed, trying L1:", erErr);
+          }
+        } else if (isDelegated) {
+          setError("Game is delegated, but ER provider is unavailable");
+          return null;
+        }
+
+        // Fallback to L1 only if account is owned by Fleet Wars program
+        if (canUseL1 && baseProvider) {
+          try {
+            const program = getProgram(baseProvider);
+            const signature = await program.methods
+              .fireShot(cell)
+              .accounts({
+                game: gamePda,
+                player: publicKey,
+              })
+              .rpc();
+
+            console.log("Shot fired on L1 at cell", cell, "tx:", signature);
+            return signature;
+          } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Failed to fire shot";
+            console.error("Fire shot error:", err);
+            setError(message);
+            return null;
+          }
+        }
+
+        setError("No provider available for current game state");
+        return null;
+      } finally {
+        setLoading(false);
+      }
     },
-    [erProvider, baseProvider, publicKey]
+    [erProvider, baseProvider, publicKey, connection]
   );
 
   // Respond to shot - try ER first, fallback to L1
@@ -316,52 +357,86 @@ export function useFleetWars() {
       setLoading(true);
       setError(null);
 
-      // Try ER first
-      if (erProvider) {
-        try {
-          const program = getProgram(erProvider);
-          const signature = await program.methods
-            .respondShot(hit)
-            .accounts({
-              game: gamePda,
-              player: publicKey,
-            })
-            .rpc();
-
-          console.log("Responded on ER, hit:", hit, "tx:", signature);
-          return signature;
-        } catch (erErr: unknown) {
-          console.warn("ER respond shot failed, trying L1:", erErr);
-        }
-      }
-
-      // Fallback to L1
-      if (baseProvider) {
-        try {
-          const program = getProgram(baseProvider);
-          const signature = await program.methods
-            .respondShot(hit)
-            .accounts({
-              game: gamePda,
-              player: publicKey,
-            })
-            .rpc();
-
-          console.log("Responded on L1, hit:", hit, "tx:", signature);
-          return signature;
-        } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : "Failed to respond to shot";
-          console.error("Respond shot error:", err);
-          setError(message);
+      try {
+        const accountInfo = await connection.getAccountInfo(gamePda);
+        if (!accountInfo) {
+          setError("Game account not found");
           return null;
         }
-      }
 
-      setError("No provider available");
-      setLoading(false);
-      return null;
+        const isDelegated = accountInfo.owner.equals(DELEGATION_PROGRAM_ID);
+        const canUseL1 = accountInfo.owner.equals(FLEET_WARS_PROGRAM_ID);
+
+        // Try ER first
+        if (erProvider) {
+          try {
+            const program = getProgram(erProvider);
+            const sendEr = async () =>
+              program.methods
+                .respondShot(hit)
+                .accounts({
+                  game: gamePda,
+                  player: publicKey,
+                })
+                .rpc();
+
+            let signature: string;
+            try {
+              signature = await sendEr();
+            } catch (erErr: unknown) {
+              if (isBlockhashNotFound(erErr)) {
+                await sleep(500);
+                signature = await sendEr();
+              } else {
+                throw erErr;
+              }
+            }
+
+            console.log("Responded on ER, hit:", hit, "tx:", signature);
+            return signature;
+          } catch (erErr: unknown) {
+            if (isDelegated) {
+              const message = erErr instanceof Error ? erErr.message : "Failed to respond on ER";
+              console.error("ER respond shot failed:", erErr);
+              setError(message);
+              return null;
+            }
+            console.warn("ER respond shot failed, trying L1:", erErr);
+          }
+        } else if (isDelegated) {
+          setError("Game is delegated, but ER provider is unavailable");
+          return null;
+        }
+
+        // Fallback to L1 only if account is owned by Fleet Wars program
+        if (canUseL1 && baseProvider) {
+          try {
+            const program = getProgram(baseProvider);
+            const signature = await program.methods
+              .respondShot(hit)
+              .accounts({
+                game: gamePda,
+                player: publicKey,
+              })
+              .rpc();
+
+            console.log("Responded on L1, hit:", hit, "tx:", signature);
+            return signature;
+          } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Failed to respond to shot";
+            console.error("Respond shot error:", err);
+            setError(message);
+            return null;
+          }
+        }
+
+        setError("No provider available for current game state");
+        return null;
+      } finally {
+        setLoading(false);
+      }
     },
-    [erProvider, baseProvider, publicKey]
+    [erProvider, baseProvider, publicKey, connection]
   );
 
   // End session (manual undelegate)
